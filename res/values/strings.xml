@@ -1,6 +1,7 @@
 <resources>
 
-    <string name="app_name">XposedMtcRadio</string>
-    <string name="app_version_name" translatable="false">1.0</string>
+    <string name="app_name" translatable="false">XposedMtcRadio</string>
+    <string name="app_desc">Show station names in Radio app</string>
+    <string name="app_version_name" translatable="false">1.1a</string>
 
 </resources>

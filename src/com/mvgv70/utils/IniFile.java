@@ -107,6 +107,7 @@ public class IniFile
     return value;
   }
   
+  // поиск строкового значения
   public String getValue(String section, String key)
   {
     String line;
@@ -125,6 +126,59 @@ public class IniFile
       }
     }
     return "";
+  }
+  
+  // поиск целочисленного значения
+  public int getIntValue(String section, String key, int defValue)
+  {
+	int result = defValue;
+	String value = getValue(section,key);
+	if (!value.isEmpty())
+	{
+      try
+      {
+        result = Integer.valueOf(value);
+      }
+      catch (Exception E)
+      {
+        result = defValue;
+      }
+	}
+	return result;
+  }
+  
+  // поиск значения boolean
+  public boolean getBoolValue(String section, String key, boolean defValue)
+  {
+	boolean result = defValue;
+    String value = getValue(section,key);
+    if (!value.isEmpty())
+    {
+      if ((value.equals("1")) || (value.equalsIgnoreCase("true")))
+        result = true;
+      else if ((value.equals("0")) || (value.equalsIgnoreCase("false")))
+        result = false;
+    }
+    return result;
+  }
+  
+  // поиск значения float
+  public float getFloatValue(String section, String key, float defValue)
+  {
+	float result = defValue;
+    String value = getValue(section,key);
+    if (!value.isEmpty())
+    {
+      try
+      {
+        result = Float.valueOf(value);
+      }
+      catch (Exception E)
+      {
+        result = defValue;
+      }
+    }
+    return result;
   }
   
   // установка значения
@@ -210,6 +264,11 @@ public class IniFile
       while (lines.hasNext()) 
         Log.d(TAG,lines.next());
     }
+  }
+  
+  public float getAccuracy()
+  {
+    return 10;
   }
 
 }
