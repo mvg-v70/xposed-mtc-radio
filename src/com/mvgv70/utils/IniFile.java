@@ -24,10 +24,6 @@ public class IniFile
     // пустая секция
     ini_file.put("", new ArrayList<String>());
     br = new BufferedReader(new FileReader(fileName));
-    /*
-      FileInputStream fis =  new FileInputStream("your_file_name.txt");
-      BufferedReader r = new BufferedReader(new InputStreamReader(fis, "Cp1251"));
-    */
     try 
     {
       while ((line = br.readLine()) != null)
@@ -72,6 +68,11 @@ public class IniFile
     }
   }
   
+  public void clear()
+  {
+    ini_file.clear();
+  }
+  
   public Iterator<String> enumSections()
   {
     return ini_file.keySet().iterator();
@@ -79,12 +80,20 @@ public class IniFile
   
   public Iterator<String> enumLines(String section)
   {
-    return ini_file.get(section).iterator();
+	ArrayList<String> asection = ini_file.get(section);
+	if (asection != null)
+      return ini_file.get(section).iterator();
+	else
+	  return null;
   }
   
   public int linesCount(String section)
   {
-    return ini_file.get(section).size();
+	ArrayList<String> asection = ini_file.get(section);
+	if (asection != null)
+      return asection.size();
+	else
+	  return 0;
   }
   
   public String getStringKey(String line)
@@ -128,23 +137,64 @@ public class IniFile
     return "";
   }
   
+  // поиск строкового значения
+  public String getValue(String section, String key, String defValue)
+  {
+    String line;
+    ArrayList<String> lines = ini_file.get(section);
+    if (lines != null)
+    {
+      // возможно лучше сделать через Iterator
+      for(int i = 0; i < lines.size(); i++)
+      {
+        line = lines.get(i);
+        if (line.startsWith(key+"="))
+        {
+          int equalIndex = line.indexOf("=");
+          String value = line.substring(equalIndex+1).trim();
+          return value; 
+        }
+      }
+    }
+    return defValue;
+  }
+  
   // поиск целочисленного значения
   public int getIntValue(String section, String key, int defValue)
   {
-	int result = defValue;
-	String value = getValue(section,key);
-	if (!value.isEmpty())
-	{
+    int result = defValue;
+    String value = getValue(section,key);
+    if (!value.isEmpty())
+    {
       try
       {
-        result = Integer.valueOf(value);
+        result = Integer.decode(value);
       }
       catch (Exception E)
       {
         result = defValue;
       }
-	}
-	return result;
+    }
+    return result;
+  }
+  
+  // поиск значения long
+  public long getLongValue(String section, String key, long defValue)
+  {
+    long result = defValue;
+    String value = getValue(section,key);
+    if (!value.isEmpty())
+    {
+      try
+      {
+        result = Long.decode(value);
+      }
+      catch (Exception E)
+      {
+        result = defValue;
+      }
+    }
+    return result;
   }
   
   // поиск значения boolean

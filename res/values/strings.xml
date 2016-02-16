@@ -1,7 +1,7 @@
 <resources>
 
-    <string name="app_name" translatable="false">XposedMtcRadio</string>
-    <string name="app_desc">Show station names in Radio app</string>
-    <string name="app_version_name" translatable="false">1.1a</string>
+   <string name="app_name" translatable="false">XposedMTCMusic</string>
+   <string name="app_version_name" translatable="false">1.0</string>
+   <string name="app_description">correct work with media mount in mtc music app</string>
 
 </resources>
