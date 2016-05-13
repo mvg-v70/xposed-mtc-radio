@@ -8,9 +8,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 
 import android.util.Log;
 
+//
+//     version 1.1.0
+//
 public class IniFile 
 {
 	
@@ -18,16 +22,24 @@ public class IniFile
 	
   public void loadFromFile(String fileName) throws IOException
   {
-    BufferedReader br;
+    final String BOM = "\uFEFF"; 
+    int line_no = 1;
     String line;
     String section = "";
     // пустая секция
     ini_file.put("", new ArrayList<String>());
-    br = new BufferedReader(new FileReader(fileName));
+    BufferedReader br = new BufferedReader(new FileReader(fileName));
     try 
+ 
     {
       while ((line = br.readLine()) != null)
       {
+    	// выкинуть BOM из первой строки
+        if (line_no == 1) 
+        {
+          if (line.startsWith(BOM))
+            line = line.replace(BOM,"");
+        }
         // разбираем по строкам
         if (line.trim().isEmpty())
         {
@@ -54,12 +66,13 @@ public class IniFile
           if (equalIndex > 0)
           {
             String key = line.substring(0,equalIndex).trim();
-            String value = line.substring(equalIndex+1).trim();
+            String value = line.substring(equalIndex+1);
             ini_file.get(section).add(key+"="+value);
-         }
-          else
-           ini_file.get(section).add(line);
         }
+        else
+          ini_file.get(section).add(line);
+        }
+        line_no++;
       }
     }
     finally
@@ -85,6 +98,56 @@ public class IniFile
       return ini_file.get(section).iterator();
 	else
 	  return null;
+  }
+  
+  public class KeyIterator implements Iterator<String>
+  {
+    private Iterator<String> iterator;
+    private ArrayList<String> asection = new ArrayList<String>();
+	  
+    KeyIterator(String section)
+    {
+      asection = ini_file.get(section);
+      iterator = asection.iterator();
+    }
+
+    @Override
+    public boolean hasNext() 
+    {
+      return iterator.hasNext();
+	}
+
+    @Override
+    public String next() 
+    {
+      String line = iterator.next();
+      int equalIndex = line.indexOf("=");
+      if (equalIndex > 0)
+        line = line.substring(0,equalIndex).trim();
+      return line;
+	}
+
+    @Override
+    public void remove() 
+    {
+      iterator.remove();
+    }
+    
+    public int size()
+    {
+      return asection.size();
+    }
+	  
+  };
+  
+  public KeyIterator enumKeys(String section)
+  {
+    return new KeyIterator(section);
+  }
+  
+  public List<String> getLines(String section)
+  {
+    return ini_file.get(section);
   }
   
   public int linesCount(String section)
@@ -119,22 +182,7 @@ public class IniFile
   // поиск строкового значения
   public String getValue(String section, String key)
   {
-    String line;
-    ArrayList<String> lines = ini_file.get(section);
-    if (lines != null)
-    {
-      for(int i = 0; i < lines.size(); i++)
-      {
-        line = lines.get(i);
-        if (line.startsWith(key+"="))
-        {
-          int equalIndex = line.indexOf("=");
-          String value = line.substring(equalIndex+1).trim();
-          return value; 
-        }
-      }
-    }
-    return "";
+    return getValue(section, key, "");
   }
   
   // поиск строкового значения
@@ -151,7 +199,7 @@ public class IniFile
         if (line.startsWith(key+"="))
         {
           int equalIndex = line.indexOf("=");
-          String value = line.substring(equalIndex+1).trim();
+          String value = line.substring(equalIndex+1);
           return value; 
         }
       }
@@ -163,7 +211,7 @@ public class IniFile
   public int getIntValue(String section, String key, int defValue)
   {
     int result = defValue;
-    String value = getValue(section,key);
+    String value = getValue(section, key).trim();
     if (!value.isEmpty())
     {
       try
@@ -182,7 +230,7 @@ public class IniFile
   public long getLongValue(String section, String key, long defValue)
   {
     long result = defValue;
-    String value = getValue(section,key);
+    String value = getValue(section, key).trim();
     if (!value.isEmpty())
     {
       try
@@ -201,7 +249,7 @@ public class IniFile
   public boolean getBoolValue(String section, String key, boolean defValue)
   {
 	boolean result = defValue;
-    String value = getValue(section,key);
+    String value = getValue(section, key).trim();
     if (!value.isEmpty())
     {
       if ((value.equals("1")) || (value.equalsIgnoreCase("true")))
@@ -216,7 +264,7 @@ public class IniFile
   public float getFloatValue(String section, String key, float defValue)
   {
 	float result = defValue;
-    String value = getValue(section,key);
+    String value = getValue(section, key).trim();
     if (!value.isEmpty())
     {
       try
@@ -316,9 +364,4 @@ public class IniFile
     }
   }
   
-  public float getAccuracy()
-  {
-    return 10;
-  }
-
 }
