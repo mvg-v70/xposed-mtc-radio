@@ -2,7 +2,8 @@
 
     <string name="app_name" translatable="false">XposedMtcRadio</string>
     <string name="app_desc">Show station names in Radio app</string>
-    <string name="app_version_name" translatable="false">1.8</string>
+    <string name="app_version_name" translatable="false">1.11</string>
+    
     <string name="station_list_menu_item">Show station list</string>
     <string name="station_list_title">Station list</string>
     <string name="save_settings_menu_item">Save settings</string>

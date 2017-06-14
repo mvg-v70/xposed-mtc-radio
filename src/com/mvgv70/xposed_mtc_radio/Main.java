@@ -2,22 +2,20 @@ package com.mvgv70.xposed_mtc_radio;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 
 import com.mvgv70.utils.IniFile;
+import com.mvgv70.utils.Utils;
 import com.mvgv70.xposed_mtc_radio.StationList;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XSharedPreferences;
-import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import android.media.AudioManager;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -28,6 +26,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Service;
@@ -54,18 +53,19 @@ public class Main implements IXposedHookLoadPackage
   private static Service radioService;
   private static OnClickListener mUi;
   private static SharedPreferences radio_prefs; 
-  private static Handler handler;
   private static Context context;
   private static IniFile props = new IniFile();
   private static boolean titleEnable = false; 
   private static boolean buttonsEnable = false;
   private static boolean remapSearch = true;
   private static boolean toastEnable = false;
+  private static boolean amEnable = true;
   private static int toastSize = 0;
   private static boolean rdsDisable = false;
+  private static int freqBands = 4;
+  private static int freqButtons = 6;
   private static String EXTERNAL_SD = "/mnt/external_sd/";
-  private static final String INI_DIR = "mtc-radio";
-  private static String INI_FILE_NAME = EXTERNAL_SD+INI_DIR+"/mtc-radio.ini";
+  private static String INI_FILE_NAME = EXTERNAL_SD+"mtc-radio/mtc-radio.ini";
   private static final String STATION_LIST_FILE = "/com.microntek.radio_preferences.txt";
   private static final String MAIN_SECTION = "controls";
   private static final String TITLE_SECTION = "title";
@@ -82,33 +82,35 @@ public class Main implements IXposedHookLoadPackage
     // RadioActivity.onCreate(Bundle)
     XC_MethodHook onCreateActivity = new XC_MethodHook() {
 	  
+	  @SuppressLint("ShowToast")
 	  @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-    	Log.d(TAG,"Activity:onCreate");
-      	radioActivity = ((Activity)param.thisObject);
-      	active_flag = true;
-      	int btn_search_id = radioActivity.getResources().getIdentifier("btn_search","id", radioActivity.getPackageName());
-      	Log.d(TAG,"btn_search_id="+btn_search_id);
+        Log.d(TAG,"Activity:onCreate");
+        radioActivity = ((Activity)param.thisObject);
+        active_flag = true;
         // показать версию модуля
         try 
         {
           context = radioActivity.createPackageContext(getClass().getPackage().getName(), Context.CONTEXT_IGNORE_SECURITY);
-     	  // версия модуля
-     	  String version = context.getString(R.string.app_version_name);
+          // версия модуля
+          String version = context.getString(R.string.app_version_name);
           Log.d(TAG,"version="+version);
-     	} catch (NameNotFoundException e) {}
+          Log.d(TAG,"android "+Build.VERSION.RELEASE);
+        } catch (NameNotFoundException e) {}
+        // расположение настроечного файла из build.prop
+        EXTERNAL_SD = Utils.getModuleSdCard();
+        INI_FILE_NAME = EXTERNAL_SD+"mtc-radio/mtc-radio.ini";
       	// переменные
-      	mUi = (OnClickListener)XposedHelpers.getObjectField(param.thisObject, "mUi");
-      	handler = (Handler)XposedHelpers.getObjectField(param.thisObject, "handler");
+      	mUi = (OnClickListener)Utils.getObjectField(param.thisObject, "mUi");
       	// RDS
       	AudioManager am = ((AudioManager)radioActivity.getSystemService(Context.AUDIO_SERVICE));
       	rdsDisable = am.getParameters("cfg_rds=").equals("0");
       	Log.d(TAG,"rdsDisable="+rdsDisable);
-      	// настройки карты с ini-файлом
-      	readCardname();
       	// читаем список радиостанций
       	readStationList();
         // кнопка поиска
+      	int btn_search_id = radioActivity.getResources().getIdentifier("btn_search","id", radioActivity.getPackageName());
+      	Log.d(TAG,"btn_search_id="+btn_search_id);
       	if (remapSearch)
       	{
       	  Log.d(TAG,"remap search");
@@ -134,6 +136,8 @@ public class Main implements IXposedHookLoadPackage
         IntentFilter si = new IntentFilter();
         si.addAction("com.microntek.musicclockreset");
         radioActivity.registerReceiver(endClockReceiver, si);
+        // toast
+        toast = Toast.makeText(radioActivity,"",Toast.LENGTH_SHORT);
       }
     };
     
@@ -142,8 +146,8 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-    	Log.d(TAG,"Activity:onStop");
-    	active_flag = false;
+        Log.d(TAG,"Activity:onStop");
+        active_flag = false;
       }
     };
     
@@ -152,9 +156,9 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-    	Log.d(TAG,"Activity:onResume");
-    	ss_flag = false;
-    	active_flag = true;
+        Log.d(TAG,"Activity:onResume");
+        ss_flag = false;
+        active_flag = true;
       }
     };
     
@@ -163,11 +167,11 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-    	Log.d(TAG,"Activity:onDestroy");
-    	radioActivity.unregisterReceiver(endClockReceiver);
-    	active_flag = false;
-    	toast = null;
-    	radioActivity = null;
+        Log.d(TAG,"Activity:onDestroy");
+        radioActivity.unregisterReceiver(endClockReceiver);
+        active_flag = false;
+        toast = null;
+        radioActivity = null;
       }
     };
     
@@ -176,9 +180,15 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-    	Log.d(TAG,"Service:onCreate");
-    	radioService = (Service)param.thisObject;
-    	radio_prefs = (SharedPreferences)XposedHelpers.getObjectField(radioService, "app_preferences");
+        Log.d(TAG,"Service:onCreate");
+        radioService = (Service)param.thisObject;
+        radio_prefs = (SharedPreferences)Utils.getObjectField(radioService, "app_preferences");
+        // freq min/max
+        int[][] freq = (int[][])Utils.getObjectField(radioService,"freq");
+        freqBands = freq.length;
+        freqButtons = freq[0].length;
+        Log.d(TAG,"freqBands="+freqBands);
+        Log.d(TAG,"freqButtons="+freqButtons);
       }
     };
     
@@ -187,10 +197,10 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-    	Log.d(TAG,"showBandChannel");
-    	// если RDS выключен
-    	if (rdsDisable && buttonsEnable)
-    	  showStationButtons();
+        Log.d(TAG,"showBandChannel");
+        // если RDS выключен
+        if (rdsDisable && buttonsEnable)
+          showStationButtons();
       }
     };
     
@@ -199,13 +209,12 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-    	// сохраним текущую частоту радиостанции
-    	Log.d(TAG,"setFreq");
-    	mFreq = (int)param.args[0];
+        // сохраним текущую частоту радиостанции
+        mFreq = (int)param.args[0];
         strFreq = getFrequencyString(mFreq);
         freqName = getLongStationName(strFreq);
         rdsInfo = "";
-        Log.d(TAG,"freq="+mFreq+" -> "+strFreq+" -> "+freqName);
+        Log.d(TAG,"setFreq. freq="+mFreq+" -> "+strFreq+" -> "+freqName);
         // всплывающее сообщение
         showToast();    
         // послать информацию о радиостанции
@@ -225,9 +234,10 @@ public class Main implements IXposedHookLoadPackage
         String freqValue;
         readStationList();
         Editor editor = radio_prefs.edit();
-        int[][] freq = (int[][])XposedHelpers.getObjectField(radioService,"freq");
-        for (int mBand = 1; mBand <= 4; mBand++)
-          for (int index = 1; index <= 6; index ++)
+        int[][] freq = (int[][])Utils.getObjectField(radioService,"freq");
+        // TODO: цикл по диапазонам и кнопкам
+        for (int mBand = 1; mBand <= freqBands; mBand++)
+          for (int index = 1; index <= freqButtons; index ++)
           {
             memoryKey = "P"+mBand+"."+index;
             freqValue = props.getValue(MEMORY_SECTION, memoryKey, "");
@@ -244,25 +254,25 @@ public class Main implements IXposedHookLoadPackage
             }
             i++;
           }
-        XposedHelpers.setObjectField(radioService,"freq",freq);
+        Utils.setObjectField(radioService,"freq",freq);
         editor.commit();
         Log.d(TAG,"resetRadioPreference OK");
       }
     };
     
-    // RadioService.showRds()
+    // RadioActivity.showRds()
     XC_MethodHook showRds = new XC_MethodHook() {
 	           
       @Override
       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-        // установим наименование радиостанции
-        if (titleEnable && rdsDisable) 
-          handler.postDelayed(setStationName,100);
         // информация RDS
         Log.d(TAG,"showRds");
+        // установим наименование радиостанции
+        if (titleEnable && rdsDisable)
+          showStationName();
         if (!rdsDisable)
         {
-          rdsInfo = (String)XposedHelpers.getObjectField(radioService, "radioPsn");
+          rdsInfo = (String)Utils.getObjectField(radioService, "radioPsn");
           Log.d(TAG,"rdsInfo="+rdsInfo);
           // послать информацию о радиостанции
           sendFreqInfo(radioActivity);
@@ -275,15 +285,15 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-    	// если RDS выключен 
+        // если RDS выключен 
         if (rdsDisable && buttonsEnable)
         {
-          boolean mSearching = XposedHelpers.getBooleanField(radioService, "mSearching");
+          boolean mSearching = Utils.getBooleanField(radioService, "mSearching");
           if (mSearching) return;
           // устанавливаем наименование станции на кнопке-layout 
           String strFreq = (String)param.args[0];
           String freqName = getShortStationName(strFreq);
-          Log.d(TAG,"freq="+strFreq+" -> "+freqName);
+          // Log.d(TAG,"freq="+strFreq+" -> "+freqName);
           if (!freqName.isEmpty())
             // подменим параметр с наименованием станции	
             param.args[0] = freqName;
@@ -314,7 +324,7 @@ public class Main implements IXposedHookLoadPackage
 	           
       @Override
       protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-    	MenuItem menuItem = (MenuItem)param.args[0];
+        MenuItem menuItem = (MenuItem)param.args[0];
         Log.d(TAG,"onOptionsItemSelected."+menuItem.getItemId());
         if (radioActivity.hashCode() == param.thisObject.hashCode())
         {
@@ -361,24 +371,52 @@ public class Main implements IXposedHookLoadPackage
       }
     };
     
+    // RadioActivity.onNextBand()
+    XC_MethodHook onNextBand = new XC_MethodHook() {
+	           
+      @Override
+      protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+        Log.d(TAG,"onNextBand");
+        if (!amEnable)
+        {
+          Boolean mSearching = Utils.getBooleanField(radioService, "mSearching");
+          if (mSearching) Utils.callMethod(radioService, "searchStop");
+          int mBand = Utils.getIntField(radioService, "mBand");
+          Log.d(TAG,"mBand="+mBand);
+          int mChannel = Utils.getIntField(radioService, "mChannel");
+          // пропускаем диапазоны AM
+          mBand = (mBand + 1) % 3;
+          Log.d(TAG,"mBand=>"+mBand);
+          Utils.callMethod(radioService, "toBandChannel", mBand, mChannel);
+          // не вызываем оргинальный обработчик
+          param.setResult(null);
+        }
+      }
+    };
+    
     // start hooks  
     if (!lpparam.packageName.equals("com.microntek.radio")) return;
     Log.d(TAG,"package com.microntek.radio");
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onCreate", Bundle.class, onCreateActivity);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onStop", onStopActivity);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onResume", onResumeActivity);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onDestroy", onDestroyActivity);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "showBandChannel", showBandChannel);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioService", lpparam.classLoader, "onCreate", onCreateService);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioService", lpparam.classLoader, "setFreq", int.class, setFreq);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioService", lpparam.classLoader, "showRds", showRds);
-    XposedHelpers.findAndHookMethod("com.microntek.radio.RadioService", lpparam.classLoader, "resetRadioPreference", resetRadioPreference);
-    XposedHelpers.findAndHookMethod("android.app.Activity", lpparam.classLoader, "onCreateOptionsMenu", Menu.class, onCreateOptionsMenu);
-    XposedHelpers.findAndHookMethod("android.app.Activity", lpparam.classLoader, "onOptionsItemSelected", MenuItem.class, onOptionsItemSelected);
-    XposedHelpers.findAndHookMethod("android.app.Activity", lpparam.classLoader, "onActivityResult", int.class, int.class, Intent.class, onActivityResult);
+    // чтение карты обфусцированных методов
+    Utils.setTag(TAG);
+    Utils.readXposedMap();
+    // перехват методов
+    Utils.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onCreate", Bundle.class, onCreateActivity);
+    Utils.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onPause", onStopActivity);
+    Utils.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onResume", onResumeActivity);
+    Utils.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onDestroy", onDestroyActivity);
+    Utils.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "showBandChannel", showBandChannel);
+    Utils.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "showRds", showRds);
+    Utils.findAndHookMethod("com.microntek.radio.RadioActivity", lpparam.classLoader, "onNextBand", onNextBand);
+    Utils.findAndHookMethod("com.microntek.radio.RadioService", lpparam.classLoader, "onCreate", onCreateService);
+    Utils.findAndHookMethod("com.microntek.radio.RadioService", lpparam.classLoader, "setFreq", int.class, setFreq);
+    Utils.findAndHookMethod("com.microntek.radio.RadioService", lpparam.classLoader, "resetRadioPreference", resetRadioPreference);
+    Utils.findAndHookMethod("android.app.Activity", lpparam.classLoader, "onCreateOptionsMenu", Menu.class, onCreateOptionsMenu);
+    Utils.findAndHookMethod("android.app.Activity", lpparam.classLoader, "onOptionsItemSelected", MenuItem.class, onOptionsItemSelected);
+    Utils.findAndHookMethod("android.app.Activity", lpparam.classLoader, "onActivityResult", int.class, int.class, Intent.class, onActivityResult);
     try
     {
-      XposedHelpers.findAndHookMethod("com.microntek.radio.BtnChannel", lpparam.classLoader, "SetFreqText", String.class, btnSetFreqText);
+      Utils.findAndHookMethod("com.microntek.radio.BtnChannel", lpparam.classLoader, "SetFreqText", String.class, btnSetFreqText);
     }
     catch (Error e) {}
     Log.d(TAG,"com.microntek.radio hook OK");
@@ -393,7 +431,7 @@ public class Main implements IXposedHookLoadPackage
   // чтение списка радиостанций
   private void readStationList()
   {
-	String iniFile = getIniFileName();
+    String iniFile = getIniFileName();
     try
     {
       Log.d(TAG,"inifile load from "+iniFile);
@@ -406,11 +444,13 @@ public class Main implements IXposedHookLoadPackage
       remapSearch = props.getBoolValue(MAIN_SECTION, "search", true);
       toastEnable = props.getBoolValue(MAIN_SECTION, "toast", false);
       toastSize = props.getIntValue(MAIN_SECTION, "toast.size", 0);
+      amEnable = props.getBoolValue(MAIN_SECTION, "am.band", true);
       Log.d(TAG,"title="+titleEnable);
       Log.d(TAG,"buttons="+buttonsEnable);
       Log.d(TAG,"search="+remapSearch);
       Log.d(TAG,"toast="+toastEnable);
       Log.d(TAG,"toast.Size="+toastSize);
+      Log.d(TAG,"am.band="+amEnable);
     } 
     catch (Exception e) 
     {
@@ -421,35 +461,32 @@ public class Main implements IXposedHookLoadPackage
   // форматированная частота радиостанции
   private String getFrequencyString(int freq)
   {
-    return (String)XposedHelpers.callMethod(mUi, "getFreqString", freq);
+    return (String)Utils.callMethod(mUi, "getFreqString", freq);
   }
   
   // показать наименование радиостанции
   private void showStationName()
   {
     // если RDS выключен
-    XposedHelpers.callMethod(mUi, "showRadioPsn", freqName);
+    Utils.callMethod(mUi, "showRadioPsn", freqName);
   }
   
   // показать уведомление о смене станции
   private static void showToast()
   {
-	// toast показываем только, если Радио не активно и не в скринейвере
+    // toast показываем только, если Радио не активно и не в скринейвере
     if (!active_flag && toastEnable && !ss_flag)
     {
-      if (toast != null)
-      {
-        toast.cancel();
-        toast = null;
-      }
-      toast = Toast.makeText(radioActivity, strFreq+" "+freqName, Toast.LENGTH_SHORT);
-      if (toastSize > 0)
-      {
-        // toast size
-        ViewGroup group = (ViewGroup)toast.getView();
-        TextView messageTextView = (TextView)group.getChildAt(0);
-        messageTextView.setTextSize(toastSize);
-      }
+      Log.d(TAG,"showToast()");
+      if (toast == null) Log.d(TAG,"toast == null");
+      ViewGroup group = (ViewGroup)toast.getView();
+      if (group == null) Log.d(TAG,"group == null");
+      TextView toastText = (TextView)group.getChildAt(0);
+      // toast size
+      if (toastSize > 0) toastText.setTextSize(toastSize);
+      // toast text
+      toastText.setText(strFreq+" "+freqName);
+      toast.setDuration(Toast.LENGTH_SHORT);
       toast.show();
     }
   }
@@ -463,7 +500,7 @@ public class Main implements IXposedHookLoadPackage
   // короткое наименование радиостанции
   private String getShortStationName(String freq)
   {
-	String result = "";
+    String result = "";
     result = props.getValue(BUTTON_SECTION,freq);
     if (result.isEmpty())
       // если нет короткого поищем длинное
@@ -474,18 +511,18 @@ public class Main implements IXposedHookLoadPackage
   // изменение текста на кнопках
   private void showStationButtons()
   {
-	Object button;
-	Log.d(TAG,"showStationButtons");
-	// если находимся в режиме поиска, то кнопки не переименовываем
-	boolean mSearching = XposedHelpers.getBooleanField(radioService, "mSearching");
-	if (mSearching) return;
-    int mBand = XposedHelpers.getIntField(radioService,"mBand");
-    int[][] freq = (int[][])XposedHelpers.getObjectField(radioService,"freq");
-    // цикл по кнопкам
-    for (int i = 0; i < 6; i++)
+    Object button;
+    Log.d(TAG,"showStationButtons");
+    // если находимся в режиме поиска, то кнопки не переименовываем
+    boolean mSearching = Utils.getBooleanField(radioService, "mSearching");
+    if (mSearching) return;
+    int mBand = Utils.getIntField(radioService,"mBand");
+    int[][] freq = (int[][])Utils.getObjectField(radioService,"freq");
+    // TODO: цикл по кнопкам
+    for (int i = 0; i < freqButtons; i++)
     {
       // поиск кнопки
-      button = XposedHelpers.callMethod(mUi, "getChannelButton", i);
+      button = Utils.callMethod(mUi, "getChannelButton", i);
       if (button == null) return;
       // выходим, если это не кнопка, а layout
       if (!(button instanceof Button)) return;
@@ -537,26 +574,25 @@ public class Main implements IXposedHookLoadPackage
   // переход на радиостанцию
   private void gotoStation(Intent data)
   {
-	String freq = data.getStringExtra("frequency");
-	Log.d(TAG,"freq="+freq);
-	boolean mSearching = XposedHelpers.getBooleanField(radioService, "mSearching");
+    String freq = data.getStringExtra("frequency");
+    Log.d(TAG,"freq="+freq);
+    boolean mSearching = Utils.getBooleanField(radioService, "mSearching");
     if (mSearching) return;
     int freqInt = (int)(Float.valueOf(freq)*1000000);
     Log.d(TAG,"(int)freq="+freqInt);
-    XposedHelpers.callMethod(radioService, "setFreq", freqInt);
-    // XposedHelpers.callMethod(radioService, "setMute", false);
-    XposedHelpers.callMethod(radioService, "showBandChannel");
-    XposedHelpers.callMethod(radioService, "showFreq");
-    XposedHelpers.callMethod(radioService, "showRds");
-    XposedHelpers.callMethod(radioService, "showSt");
-    XposedHelpers.setIntField(radioService, "mChannel", -1);
+    Utils.callMethod(radioService, "setFreq", freqInt);
+    Utils.callMethod(radioService, "showBandChannel");
+    Utils.callMethod(radioService, "showFreq");
+    Utils.callMethod(radioService, "showRds");
+    Utils.callMethod(radioService, "showSt");
+    Utils.setIntField(radioService, "mChannel", -1);
     Log.d(TAG,"frequency set OK");
   }
   
   // диалог подтверждения копирования настроек радио
   private void confirmDialog(boolean save, String text) 
   {
-	final boolean save_settings = save; 
+    final boolean save_settings = save; 
   	AlertDialog.Builder builder = new AlertDialog.Builder(radioActivity);
     builder.setTitle(text);
     // OK
@@ -597,7 +633,8 @@ public class Main implements IXposedHookLoadPackage
     BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
     try 
     {
-      for (int i=0; i<30; i++)
+      // цикл по всем станциям
+      for (int i = 0; i < freqBands*freqButtons; i++)
       {
         freq = radio_prefs.getInt("RadioFrequency"+i, 87500000);
         bw.write(String.valueOf(freq));
@@ -621,7 +658,8 @@ public class Main implements IXposedHookLoadPackage
     BufferedReader br = new BufferedReader(new FileReader(fileName));
     try 
     {
-      for (int i=0; i<30; i++)
+      // цикл по всем станциям
+      for (int i = 0; i < freqBands*freqButtons; i++)
       {
         freq = br.readLine();
         Log.d(TAG,"freq("+i+")="+freq);
@@ -636,35 +674,8 @@ public class Main implements IXposedHookLoadPackage
     }
     // закрываем Радио
     radioActivity.finish();
-    // XposedHelpers.callMethod(radioService, "loadPreference");
+    // Utils.callMethod(radioService, "loadPreference");
   }
-  
-  // TODO: чтение имени карты, хранящей настройки
-  private void readCardname()
-  {
-    try
-    {
-      // XSharedPreferences xp = new XSharedPreferences("com.mvgv70.xposed_mtc");
-      XSharedPreferences xp = new XSharedPreferences(new File("/data/data/xposed-mtc.xml"));
-      EXTERNAL_SD = xp.getString("external_sd","");
-      Log.d(TAG,"EXTERNAL_SD.xml="+EXTERNAL_SD);
-    }
-    catch (Exception e)
-    {
-      Log.e(TAG,e.getMessage());
-    }
-    if (EXTERNAL_SD.isEmpty()) EXTERNAL_SD = "/mnt/external_sd/";
-    Log.d(TAG,"EXTERNAL_SD="+EXTERNAL_SD);
-    INI_FILE_NAME = EXTERNAL_SD+INI_DIR+"/mtc-radio.ini";
-  }
-  
-  private final Runnable setStationName = new Runnable()
-  {
-    public void run() 
-    {
-      showStationName();
-    }
-  };
   
   // обработчик длинного нажатия на кнопку поиска
   private OnLongClickListener searchLongClick = new OnLongClickListener()
@@ -678,7 +689,6 @@ public class Main implements IXposedHookLoadPackage
   
   private void sendFreqInfo(Context context)
   {
-	// TODO: если RadioActivity == null, то ничего не посылать
     if (context == null) return; 
     Intent intent = new Intent("com.android.radio.freq");
     intent.putExtra("freq", strFreq);
@@ -693,7 +703,6 @@ public class Main implements IXposedHookLoadPackage
   // обработчик com.android.music.querystate
   private BroadcastReceiver tagsQueryReceiver = new BroadcastReceiver()
   { 
-
     public void onReceive(Context context, Intent intent)
     {
       // отправить информацию о радистанции
@@ -706,7 +715,6 @@ public class Main implements IXposedHookLoadPackage
   // обработчик выключения Screen Saver
   private BroadcastReceiver endClockReceiver = new BroadcastReceiver()
   {
-
     public void onReceive(Context context, Intent intent)
     {
       Log.d(TAG,"Radio: end clock receiver");

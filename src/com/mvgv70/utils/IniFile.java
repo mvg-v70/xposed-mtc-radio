@@ -15,6 +15,7 @@ import android.util.Log;
 //
 //     version 1.1.0
 //
+
 public class IniFile 
 {
 	
@@ -30,7 +31,6 @@ public class IniFile
     ini_file.put("", new ArrayList<String>());
     BufferedReader br = new BufferedReader(new FileReader(fileName));
     try 
- 
     {
       while ((line = br.readLine()) != null)
       {
@@ -93,11 +93,11 @@ public class IniFile
   
   public Iterator<String> enumLines(String section)
   {
-	ArrayList<String> asection = ini_file.get(section);
-	if (asection != null)
+    ArrayList<String> asection = ini_file.get(section);
+    if (asection != null)
       return ini_file.get(section).iterator();
-	else
-	  return null;
+    else
+     return null;
   }
   
   public class KeyIterator implements Iterator<String>
@@ -115,7 +115,7 @@ public class IniFile
     public boolean hasNext() 
     {
       return iterator.hasNext();
-	}
+    }
 
     @Override
     public String next() 
@@ -125,7 +125,7 @@ public class IniFile
       if (equalIndex > 0)
         line = line.substring(0,equalIndex).trim();
       return line;
-	}
+    }
 
     @Override
     public void remove() 
@@ -152,16 +152,16 @@ public class IniFile
   
   public int linesCount(String section)
   {
-	ArrayList<String> asection = ini_file.get(section);
-	if (asection != null)
+    ArrayList<String> asection = ini_file.get(section);
+    if (asection != null)
       return asection.size();
-	else
-	  return 0;
+    else
+      return 0;
   }
   
   public String getStringKey(String line)
   {
-	String key;
+    String key;
     int equalIndex = line.indexOf("=");
     if (equalIndex > 0)
       key = line.substring(0,equalIndex).trim();
@@ -248,7 +248,7 @@ public class IniFile
   // поиск значени€ boolean
   public boolean getBoolValue(String section, String key, boolean defValue)
   {
-	boolean result = defValue;
+    boolean result = defValue;
     String value = getValue(section, key).trim();
     if (!value.isEmpty())
     {
@@ -263,7 +263,7 @@ public class IniFile
   // поиск значени€ float
   public float getFloatValue(String section, String key, float defValue)
   {
-	float result = defValue;
+    float result = defValue;
     String value = getValue(section, key).trim();
     if (!value.isEmpty())
     {
@@ -282,7 +282,7 @@ public class IniFile
   // установка значени€
   public void setValue(String section, String key, String value)
   {
-	String set_line = key+"="+value;
+    String set_line = key+"="+value;
     ArrayList<String> lines = ini_file.get(section);
     if (lines == null)
     {
@@ -290,7 +290,7 @@ public class IniFile
       ini_file.put(section, new ArrayList<String>());	  
       ini_file.get(section).add(set_line);
     }
-	else
+    else
     {
 	  int index = -1;
 	  String line;
@@ -309,25 +309,25 @@ public class IniFile
       if (index >= 0)
         lines.set(index,set_line);
       else
-    	lines.add(set_line);
+       lines.add(set_line);
     }
   }
   
   // добавление строки
   public void addLine(String section, String line)
   {
-	ArrayList<String> lines = ini_file.get(section);
-	if (lines == null)
-	  // секции нет
-	  ini_file.put(section, new ArrayList<String>());	  
-	ini_file.get(section).add(line);
+    ArrayList<String> lines = ini_file.get(section);
+    if (lines == null)
+	    // секции нет
+      ini_file.put(section, new ArrayList<String>());	  
+    ini_file.get(section).add(line);
   }
   
   // сохранение в файл, тер€ютс€ комментарии и пустые строки
   public void saveToFile(String fileName) throws IOException
   {
     BufferedWriter bw;
-	bw = new BufferedWriter(new FileWriter(fileName));
+    bw = new BufferedWriter(new FileWriter(fileName));
     try 
     {
       Iterator<String> sections = enumSections();
@@ -338,10 +338,10 @@ public class IniFile
   	    bw.newLine();
   	    Iterator<String> lines = enumLines(line);
   	    while (lines.hasNext()) 
-  		{
+        {
   	      bw.write(lines.next());
   	      bw.newLine();
-  		}
+        }
   	  }
     }
     finally
